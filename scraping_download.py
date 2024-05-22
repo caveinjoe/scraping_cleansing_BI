@@ -1,12 +1,11 @@
 # Import libraries
 import time
 import os
-import requests
+import httpx
 import json
 import pandas as pd
 from bs4 import BeautifulSoup
 from io import BytesIO
-from zipfile import ZipFile
 from zipfile import ZipFile
 from selenium import webdriver 
 from selenium.webdriver.common.by import By
@@ -15,6 +14,17 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import Select
 
+# import logging
+# import http.client
+
+# http.client.HTTPConnection.debuglevel = 1
+
+# # You must initialize logging, otherwise you'll not see debug output.
+# logging.basicConfig()
+# logging.getLogger().setLevel(logging.DEBUG)
+# requests_log = logging.getLogger("requests.packages.urllib3")
+# requests_log.setLevel(logging.DEBUG)
+# requests_log.propagate = True
 
 # define the url
 base_url= "https://www.bi.go.id/id/statistik/ekonomi-keuangan/sekda/StatistikRegionalDetail.aspx"
@@ -186,7 +196,7 @@ def extract_context(category_links):
         for url in url_list:
             try:
                 print(f"Downloading: {url}")
-                response = requests.get(url)
+                response = httpx.get(url)
                 response.raise_for_status()
                 with ZipFile(BytesIO(response.content)) as zipfile:
                     # Extract each file in the ZIP archive
@@ -194,13 +204,20 @@ def extract_context(category_links):
                         with zipfile.open(file_name) as extracted_file:
                             print(f"Extracting: {file_name}")
                             soup = BeautifulSoup(extracted_file, 'html.parser')
-                            # Extracting the years from the relevant <td> tags
+                            # Extracting the years from the relevant <td> tags  
                             year_row = soup.find('tr', class_='xl25')
-                            years = [td.get_text(strip=True) for td in year_row.find_all('td', class_='x128')]
+                            years = []
+                            if year_row:
+                                cells = year_row.find_all('td')
+                                print(cells)
+                                for cell in cells:
+                                    if 'x:num' in cell.attrs:
+                                        year = cell.get_text(strip=True)
+                                        years.extend([year])
                             print(f"YEARS: {years}")
 
 
-            except requests.exceptions.RequestException as e:
+            except httpx.RequestError as e:
                 print(f"HTTP request error: {e}")
             except Exception as e:
                 print(f"An error occurred: {e}")
