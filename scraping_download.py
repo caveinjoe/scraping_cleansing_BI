@@ -190,38 +190,6 @@ def get_links(url):
     
     return category_links
 
-# Extract context (XLS files are actually in HTML format)
-def extract_context(category_links):
-    for url_list in category_links.values():
-        for url in url_list:
-            try:
-                print(f"Downloading: {url}")
-                response = httpx.get(url)
-                response.raise_for_status()
-                with ZipFile(BytesIO(response.content)) as zipfile:
-                    # Extract each file in the ZIP archive
-                    for file_name in zipfile.namelist():
-                        with zipfile.open(file_name) as extracted_file:
-                            print(f"Extracting: {file_name}")
-                            soup = BeautifulSoup(extracted_file, 'html.parser')
-                            # Extracting the years from the relevant <td> tags  
-                            year_row = soup.find('tr', class_='xl25')
-                            years = []
-                            if year_row:
-                                cells = year_row.find_all('td')
-                                print(cells)
-                                for cell in cells:
-                                    if 'x:num' in cell.attrs:
-                                        year = cell.get_text(strip=True)
-                                        years.extend([year])
-                            print(f"YEARS: {years}")
-
-
-            except httpx.RequestError as e:
-                print(f"HTTP request error: {e}")
-            except Exception as e:
-                print(f"An error occurred: {e}")
-
 def main():
     if not validate_link_file(link_file_path):
         category_links = get_links(base_url)
@@ -232,7 +200,6 @@ def main():
         except json.JSONDecodeError:
             get_links(base_url)
 
-    extract_context(category_links)
 
 if __name__ == "__main__":
     main()
