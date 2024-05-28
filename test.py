@@ -1,10 +1,9 @@
 import pandas as pd
 
-# Path ke file yang diunggah
-file_path = 'ii04.xls'
+file_path = 'ii16.xls'
 
-# Membaca file Excel
-df = pd.read_excel(file_path)
+tables = pd.read_html(file_path)
 
-# Menampilkan kolom yang ada untuk referensi
-df.show()
+df = tables[0]
+
+df.to_excel("test_16.xlsx")

@@ -8,13 +8,12 @@ from enum import Enum
 # Propinsi: str
 
 class ProductType(Enum):
-    Giro = "Giro"
-    Simpanan = "Simpanan Berjangka"
-    Tabungan = "Tabungan"
+    ModalKerja = "Modal Kerja"
+    Investasi = "Investasi"
+    Konsumsi = "Konsumsi"
 
 class ProductAttr(Enum):
     Nominal = "Nominal"
-    Jumlah = "Jumlah"
 
 def get_years_months(df: pd.DataFrame, year_row: int, month_row: int):
     VALID_MONTHS = [
@@ -46,22 +45,19 @@ def format_data(year: int, month: str, dati_ii: str, details: dict):
             "Tahun": year,
             "Bulan": month if month != year else None,
             "Dati II": dati_ii,
-            ProductType.Giro.value: [
+            ProductType.ModalKerja.value: [
                 {
-                    ProductAttr.Nominal.value: details[ProductType.Giro][ProductAttr.Nominal],
-                    ProductAttr.Jumlah.value: details[ProductType.Giro][ProductAttr.Jumlah]
+                    ProductAttr.Nominal.value: details[ProductType.ModalKerja]
                 }
             ],
-            ProductType.Simpanan.value: [
+            ProductType.Investasi.value: [
                 {
-                    ProductAttr.Nominal.value: details[ProductType.Simpanan][ProductAttr.Nominal],
-                    ProductAttr.Jumlah.value: details[ProductType.Simpanan][ProductAttr.Jumlah]
+                    ProductAttr.Nominal.value: details[ProductType.Investasi]
                 }
             ],
-            ProductType.Tabungan.value: [
+            ProductType.Konsumsi.value: [
                 {
-                    ProductAttr.Nominal.value: details[ProductType.Tabungan][ProductAttr.Nominal],
-                    ProductAttr.Jumlah.value: details[ProductType.Tabungan][ProductAttr.Jumlah]
+                    ProductAttr.Nominal.value: details[ProductType.Konsumsi]
                 }
             ],
         }
@@ -80,7 +76,7 @@ def get_values(df: pd.DataFrame, ym_list, start_x_index):
         pattern = r'PROPINSI\s*([\w\s]+)'
 
         # Search for the pattern in the first column
-        for index, value in dfp[0].items():
+        for index, value in dfp[1].items():
             match = re.search(pattern, str(value))
             if match:
                 # Extract the province name from the matched pattern
@@ -95,10 +91,10 @@ def get_values(df: pd.DataFrame, ym_list, start_x_index):
 
     # Row 1 = Nominal, Row 2 = Jumlah
     def get_row_index(dfp, product: ProductType, current_row_index):
-        row1 = dfp.iloc[current_row_index:current_row_index+7, 2] == product.value
-        row1 = row1.astype(int).idxmax()
-        row2 = row1 + 1
-        return row1, row2
+        row = dfp.iloc[current_row_index:current_row_index+4, 3] == product.value
+        row = row.astype(int).idxmax()
+        print(current_row_index, product, row)
+        return row
 
     # Get the index of the first entry
     current_row_index = df.index[df.iloc[:, 0] == "1"].min()
@@ -118,13 +114,8 @@ def get_values(df: pd.DataFrame, ym_list, start_x_index):
             month = pair[1]
             details = {}
             for product in ProductType:
-                row1, row2 = get_row_index(df, product, current_row_index)
-                detail = {
-                ProductAttr.Nominal: df.iloc[row1, current_col_index],
-                ProductAttr.Jumlah: df.iloc[row2, current_col_index]
-                }
-
-                details[product] = detail
+                row = get_row_index(df, product, current_row_index)
+                details[product] = df.iloc[row, current_col_index]
             
 
             formatted_data = format_data(year, month, dati_ii, details)
@@ -152,7 +143,7 @@ def flatten_data(data):
     
     return df_all
 
-def Transform04(file_p, excel_file_p):
+def Transform16(file_p, excel_file_p):
     print(f"Transforming: {file_p}")
     # Extract years and months
     tables = pd.read_html(file_p)
@@ -161,8 +152,8 @@ def Transform04(file_p, excel_file_p):
     df = tables[0]
 
     # Get the years and months as a list
-    year_row = 4
-    month_row = 5
+    year_row = 5
+    month_row = 6
     ym_list, start_x_index = get_years_months(df, year_row, month_row)
 
     # Get the formatted data
@@ -172,7 +163,7 @@ def Transform04(file_p, excel_file_p):
     df_all = flatten_data(data)
 
     # Reorder columns
-    df_all = df_all[['Propinsi', 'Dati II', 'Tahun', 'Bulan', 'Tipe', 'Nominal', 'Jumlah']]
+    df_all = df_all[['Propinsi', 'Dati II', 'Tahun', 'Bulan', 'Tipe', 'Nominal']]
 
     # Print the DataFrame
     print(df_all)
@@ -182,6 +173,6 @@ def Transform04(file_p, excel_file_p):
     print(f"Transform Complete. Saved to: {excel_file_p}")
 
 if __name__ == "__main__":
-    file_path = "./ii04.xls"
-    excel_file_path = "summary_04.xlsx"
-    Transform04(file_path, excel_file_path)
+    file_path = "./ii16.xls"
+    excel_file_path = "summary_16.xlsx"
+    Transform16(file_path, excel_file_path)
