@@ -15,6 +15,10 @@ class ProductType(Enum):
 class ProductAttr(Enum):
     Nominal = "Nominal"
 
+class Currency(Enum):
+    Rupiah = "Rupiah"
+    Asing = "Valuta Asing"
+
 def get_years_months(df: pd.DataFrame, year_row: int, month_row: int):
     VALID_MONTHS = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -39,12 +43,13 @@ def get_years_months(df: pd.DataFrame, year_row: int, month_row: int):
 
     return years_months_list, start_x_index
 
-def format_data(year: int, month: str, dati_ii: str, details: dict):
+def format_data(year: int, month: str, dati_ii: str, details: dict, kurs: Currency):
     formatted_data = [
         {
             "Tahun": year,
             "Bulan": month if month != year else None,
             "Dati II": dati_ii,
+            "Kurs": kurs.value,
             ProductType.ModalKerja.value: [
                 {
                     ProductAttr.Nominal.value: details[ProductType.ModalKerja]
@@ -66,7 +71,8 @@ def format_data(year: int, month: str, dati_ii: str, details: dict):
 
 def get_values(df: pd.DataFrame, ym_list, start_x_index):
     
-    ROW_INDEX_INC = 7
+    # Change these based on the row and column index increments per value
+    ROW_INDEX_INC = 4
     COL_INDEX_INC = 1
     
     data = []
@@ -93,16 +99,38 @@ def get_values(df: pd.DataFrame, ym_list, start_x_index):
     def get_row_index(dfp, product: ProductType, current_row_index):
         row = dfp.iloc[current_row_index:current_row_index+4, 3] == product.value
         row = row.astype(int).idxmax()
-        print(current_row_index, product, row)
         return row
 
-    # Get the index of the first entry
-    current_row_index = df.index[df.iloc[:, 0] == "1"].min()
+    # Get the index of rupiah
+    rupiah_index = df.index[df.iloc[:, 0] == Currency.Rupiah.value].min()
+
+    # Get the index of foreign currencies
+    foreign_index = df.index[df.iloc[:, 0] == Currency.Asing.value].min()
+
+    # Get the index of aggregate values to be excluded
+    jumlah_index = df.index[df.iloc[:, 0] == "Jumlah"].min()
+
+    # Start with the lower index
+    low_idx, high_idx = (min(rupiah_index, foreign_index), max(rupiah_index, foreign_index))
+    sliced_df = df.iloc[low_idx:, 0]
+    current_row_index = sliced_df[sliced_df == "1"].index[0]
+    curr = Currency.Rupiah if rupiah_index < foreign_index else Currency.Asing
 
     # Table height
     height = df.shape[0]
 
-    while current_row_index <= height:
+    high_flag = False
+    while current_row_index < height:
+        if current_row_index > high_idx and high_flag == False:
+            sliced_df = df.iloc[high_idx:, 0]
+            current_row_index = sliced_df[sliced_df == "1"].index[0]
+            curr = Currency.Asing if curr != Currency.Asing else Currency.Rupiah
+            high_flag = True
+        print(curr)
+        print(current_row_index)
+        if current_row_index > jumlah_index:
+            break
+
         dati_ii = df.iloc[current_row_index, 1]
         if pd.isna(dati_ii) or dati_ii == globals()["Propinsi"]:
             current_row_index += ROW_INDEX_INC
@@ -116,9 +144,10 @@ def get_values(df: pd.DataFrame, ym_list, start_x_index):
             for product in ProductType:
                 row = get_row_index(df, product, current_row_index)
                 details[product] = df.iloc[row, current_col_index]
+            kurs = curr
             
 
-            formatted_data = format_data(year, month, dati_ii, details)
+            formatted_data = format_data(year, month, dati_ii, details, kurs)
 
             data.append(formatted_data)
 
@@ -130,7 +159,7 @@ def get_values(df: pd.DataFrame, ym_list, start_x_index):
 # Function to flatten the JSON structure for multiple years
 def flatten_data(data):
     def get_df(inp, record_path):
-        df_sub = pd.json_normalize(inp, record_path=[record_path], meta=['Tahun', 'Bulan', 'Dati II'])
+        df_sub = pd.json_normalize(inp, record_path=[record_path], meta=['Tahun', 'Bulan', 'Dati II', 'Kurs'])
         df_sub['Tipe'] = record_path
         df_sub['Propinsi'] = globals()["Propinsi"]
         return df_sub
@@ -163,10 +192,10 @@ def Transform16(file_p, excel_file_p):
     df_all = flatten_data(data)
 
     # Reorder columns
-    df_all = df_all[['Propinsi', 'Dati II', 'Tahun', 'Bulan', 'Tipe', 'Nominal']]
+    df_all = df_all[['Propinsi', 'Dati II', 'Tahun', 'Bulan', 'Kurs', 'Tipe', 'Nominal']]
 
     # Print the DataFrame
-    print(df_all)
+    # print(df_all)
 
     # Save to excel
     df_all.to_excel(excel_file_p, index=False, sheet_name='Summary')
